@@ -52,11 +52,11 @@
 		{
 			"label": "TZ: flash",
 			"type": "shell",
-			"command": "STM32_Programmer_CLI -c port=SWD mode=HotPlug ap=1 -w Secure/build/sec_flash_demo_s.elf -w NonSecure/build/sec_flash_demo_ns.elf -rst",
+			"command": "python ROT_Provisioning/scripts/flash_closed.py --target stm32h533retx --halt Secure/build/sec_flash_demo_s.elf NonSecure/build/sec_flash_demo_ns.elf",
 			"options": { "cwd": "${workspaceFolder}" },
 			"linux": { "options": { "shell": { "executable": "bash", "args": ["-l", "-c"] } } },
 			"problemMatcher": [],
-			"detail": "Flash both images over HotPlug, which reaches a provisioned part after the DA unlock and reproduces the CubeProgrammer secure-flash bug there",
+			"detail": "Flash both images through the correct secure/non-secure flash controllers (the fix for the CubeProgrammer bug), then hold the core at the secure reset vector",
 			"dependsOrder": "sequence",
 			"dependsOn": ["TZ: unlock debug if needed", "TZ: verify option bytes"]
 		}
