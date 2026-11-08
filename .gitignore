@@ -1,0 +1,6 @@
+build/
+Secure/build/
+NonSecure/build/
+Secure_nsclib/secure_nsclib.o
+*.map
+compile_commands.json
