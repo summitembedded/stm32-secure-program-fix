@@ -1,0 +1,60 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "TZ (JTAG): Build & Debug",
+            "cwd": "${workspaceFolder}",
+            "type": "cortex-debug",
+            // Boot starts secure, so the secure image is the primary executable.
+            "executable": "${workspaceFolder}/Secure/build/sec_flash_demo_s.elf",
+            "request": "attach",
+            "servertype": "stlink",
+            "device": "STM32H533RETx",
+            "interface": "swd",
+            "serialNumber": "",
+            "svdFile": "${config:STM32VSCodeExtension.cubeCLT.path}/STMicroelectronics_CMSIS_SVD/STM32H533.svd",
+            "serverpath": "${config:STM32VSCodeExtension.cubeCLT.path}/STLink-gdb-server/bin/ST-LINK_gdbserver",
+            "stm32cubeprogrammer": "${config:STM32VSCodeExtension.cubeCLT.path}/STM32CubeProgrammer/bin",
+            "stlinkPath": "${config:STM32VSCodeExtension.cubeCLT.path}/STLink-gdb-server/bin/ST-LINK_gdbserver",
+            "armToolchainPath": "${config:STM32VSCodeExtension.cubeCLT.path}/GNU-tools-for-STM32/bin",
+            "gdbPath": "${config:STM32VSCodeExtension.cubeCLT.path}/GNU-tools-for-STM32/bin/arm-none-eabi-gdb",
+            "showDevDebugOutput": "none",
+            // The M33 sits behind AP 1. Without this the gdbserver probes AP 0 and
+            // dies with "Target unknown error 32 / check power and cabling".
+            "serverArgs": ["-m", "1"],
+            // Both symbol sets, or breakpoints in the other world never resolve.
+            "symbolFiles": [
+                "${workspaceFolder}/Secure/build/sec_flash_demo_s.elf",
+                "${workspaceFolder}/NonSecure/build/sec_flash_demo_ns.elf"
+            ],
+            // `TZ: flash` uses --halt, so continue after
+            "postStartSessionCommands": ["continue"],
+            "preLaunchTask": "TZ: flash"
+        },
+        {
+            "name": "TZ (JTAG): Attach",
+            "cwd": "${workspaceFolder}",
+            "type": "cortex-debug",
+            "executable": "${workspaceFolder}/Secure/build/sec_flash_demo_s.elf",
+            "request": "attach",
+            "servertype": "stlink",
+            "device": "STM32H533RETx",
+            "interface": "swd",
+            "serialNumber": "",
+            "runToEntryPoint": "main",
+            "svdFile": "${config:STM32VSCodeExtension.cubeCLT.path}/STMicroelectronics_CMSIS_SVD/STM32H533.svd",
+            "serverpath": "${config:STM32VSCodeExtension.cubeCLT.path}/STLink-gdb-server/bin/ST-LINK_gdbserver",
+            "stm32cubeprogrammer": "${config:STM32VSCodeExtension.cubeCLT.path}/STM32CubeProgrammer/bin",
+            "stlinkPath": "${config:STM32VSCodeExtension.cubeCLT.path}/STLink-gdb-server/bin/ST-LINK_gdbserver",
+            "armToolchainPath": "${config:STM32VSCodeExtension.cubeCLT.path}/GNU-tools-for-STM32/bin",
+            "gdbPath": "${config:STM32VSCodeExtension.cubeCLT.path}/GNU-tools-for-STM32/bin/arm-none-eabi-gdb",
+            "showDevDebugOutput": "none",
+            "serverArgs": ["-m", "1"],
+            "symbolFiles": [
+                "${workspaceFolder}/Secure/build/sec_flash_demo_s.elf",
+                "${workspaceFolder}/NonSecure/build/sec_flash_demo_ns.elf"
+            ],
+            "preLaunchTask": "TZ: unlock debug if needed"
+        }
+    ]
+}

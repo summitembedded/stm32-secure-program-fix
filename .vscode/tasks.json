@@ -1,0 +1,55 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "TZ: configure",
+			"type": "shell",
+			"command": "cmake --preset Debug",
+			"options": { "cwd": "${workspaceFolder}" },
+			"linux": { "options": { "shell": { "executable": "bash", "args": ["-l", "-c"] } } },
+			"problemMatcher": [],
+			"detail": "Configure CMake for the TrustZone demo (build/Debug/)"
+		},
+		{
+			"label": "TZ: build",
+			"type": "shell",
+			"command": "cmake --build --preset Debug",
+			"options": { "cwd": "${workspaceFolder}" },
+			"linux": { "options": { "shell": { "executable": "bash", "args": ["-l", "-c"] } } },
+			"group": { "kind": "build", "isDefault": true },
+			"problemMatcher": ["$gcc"],
+			"detail": "Build both contexts: Secure/build/sec_flash_demo_s.elf, NonSecure/build/sec_flash_demo_ns.elf",
+			"dependsOn": ["TZ: configure"]
+		},
+		{
+			"label": "TZ: unlock debug if needed",
+			"type": "shell",
+			"command": "./da.sh ensure eh",
+			"options": { "cwd": "${workspaceFolder}/ROT_Provisioning/scripts" },
+			"linux": { "options": { "shell": { "executable": "bash", "args": ["-l", "-c"] } } },
+			"problemMatcher": [],
+			"detail": "No-op on Open boards or if already unlocked; otherwise debug-auth unlock at HDPL1 until power-off"
+		},
+		{
+			"label": "TZ: verify option bytes",
+			"type": "shell",
+			"command": "${workspaceFolder}/ROT_Provisioning/scripts/check_option_bytes.py",
+			"options": { "cwd": "${workspaceFolder}" },
+			"linux": { "options": { "shell": { "executable": "bash", "args": ["-l", "-c"] } } },
+			"problemMatcher": [],
+			"detail": "Verify that the board's option bytes (TZEN, SECWM*, etc) match expected. If not, prompt user to fix them.",
+			"dependsOn": ["TZ: build"]
+		},
+		{
+			"label": "TZ: flash",
+			"type": "shell",
+			"command": "STM32_Programmer_CLI -c port=SWD mode=HotPlug ap=1 -w Secure/build/sec_flash_demo_s.elf -w NonSecure/build/sec_flash_demo_ns.elf -rst",
+			"options": { "cwd": "${workspaceFolder}" },
+			"linux": { "options": { "shell": { "executable": "bash", "args": ["-l", "-c"] } } },
+			"problemMatcher": [],
+			"detail": "Flash both images over HotPlug, which reaches a provisioned part after the DA unlock and reproduces the CubeProgrammer secure-flash bug there",
+			"dependsOrder": "sequence",
+			"dependsOn": ["TZ: unlock debug if needed", "TZ: verify option bytes"]
+		}
+	]
+}
