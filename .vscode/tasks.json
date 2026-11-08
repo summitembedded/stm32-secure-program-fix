@@ -11,6 +11,15 @@
 			"detail": "Configure CMake for the TrustZone demo (build/Debug/)"
 		},
 		{
+			"label": "TZ: refresh build stamp",
+			"type": "shell",
+			"command": "touch Secure/Src/main.c",
+			"options": { "cwd": "${workspaceFolder}" },
+			"linux": { "options": { "shell": { "executable": "bash", "args": ["-l", "-c"] } } },
+			"problemMatcher": [],
+			"detail": "Force the secure main.c to recompile so the build timestamp updates every flash"
+		},
+		{
 			"label": "TZ: build",
 			"type": "shell",
 			"command": "cmake --build --preset Debug",
@@ -19,7 +28,7 @@
 			"group": { "kind": "build", "isDefault": true },
 			"problemMatcher": ["$gcc"],
 			"detail": "Build both contexts: Secure/build/sec_flash_demo_s.elf, NonSecure/build/sec_flash_demo_ns.elf",
-			"dependsOn": ["TZ: configure"]
+			"dependsOn": ["TZ: configure", "TZ: refresh build stamp"]
 		},
 		{
 			"label": "TZ: unlock debug if needed",

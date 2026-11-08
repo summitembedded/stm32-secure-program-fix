@@ -1,105 +1,117 @@
-## <b>STiROT_Appli_TrustZone Template Description</b>
+# Demonstrate fix to STM32CubeProgrammer flash-fail-when-closed Issue
 
-This project provides a STiROT boot path reference template. Boot is performed through STiROT boot path after authenticity and integrity checks of the project firmware and project data
-images.
+This code workspace demonstrates a fix to the issue described at https://www.summitembedded.com/blog/fixing-bugs-in-stm32s-secure-flashing-tool. ST's `STM32_Programmer_CLI` returns a `Fail to read NVM Size` error message when trying to JTAG/SWD flash a Trustzone device in the CLOSED state (even if you have the right Debug Authentication keys).
 
-This project template is based on the STM32Cube HAL API that can be used
-to build any firmware application when TrustZone security is activated (Option bit TZEN=B4).
+The core of our workaround is the [ROT_Provisioning/scripts/flash_closed.py](ROT_Provisioning/scripts/flash_closed.py) script.
 
-At the beginning of the main program, the HAL_Init() function is called to reset
-all the peripherals, initialize the Flash interface and the systick.
+This is based on a stock STM32CubeH5 V1.7.0 example (`NUCLEO-H533RE`,
+`STiROT_Appli_TrustZone`) with a CMake build configuration. It runs on a [NUCLEO-H533RE Evaluation Board](https://www.st.com/en/evaluation-tools/nucleo-h533re.html), which you can purchase for less than $30.
+- NOTE: this tutorial enables Debug Authentication on your board. If you do not wish to keep Debug Authentication enabled after completing this tutorial, remove it with the `./da.sh regress` command (see [Debug Authentication](#debug-authentication) below).
 
-The SystemClock_Config() function is used to configure the system clock (SYSCLK)
+To see the original issue, checkout the git tag `original-issue` from this repo. To then test the fix, check out the `secure-flash-fix` tag.
 
-This project is composed of two sub-projects:
+## Requirements
 
-- One for the secure application part (Project_s)
+- [STM32CubeCLT](https://www.st.com/en/development-tools/stm32cubeclt.html), with its tools on `PATH`
+- pyocd & pyelftools (`pipx install pyocd` on Ubuntu)
+- The pyocd CMSIS pack for the flash layout:
+  `pyocd pack install stm32h533retx`
+- VS Code with the `cortex-debug` extension, for F5 debugging
+- `picocom` (or other serial viewer) to see the device's output messages: `sudo apt install picocom`
 
-- One for the non-secure application part (Project_ns).
+## Semi-Automated VSCode Build/Flash
 
+To build the code and flash the device, you can simply run the `TZ (JTAG): Build & Debug` configuration in VSCode's debug menu.
 
-Please remember that on system with security enabled, the system always boots in secure and
-the secure application is responsible for launching the non-secure application. When the secure application is started the MPU
-is already configured (by STiROT) to limit the execution area to the project firmware execution slot. This is done in order to avoid
-any malicious code execution from an unauthorised area (RAM, out of execution slot in user flash ...). Once started, it is up to the secure
-application to adapt the security configuration to its needs. In this template, the MPU is simply disabled.
+If you prefer to build manually, run:
 
-This project mainly shows how to switch from secure application to non-secure application
-thanks to the system isolation performed to split the internal Flash and internal SRAM memories.
-The split of the internal Flash depends on STiROT configuration done through the provisioning steps.
-The split of the internal SRAM memories is independent from provisioning process and can be updated
-at any time before compilation steps.
+```
+cmake --preset Debug
+cmake --build --preset Debug
+```
 
-The maximum system clock frequency at 250Mhz is configured in non-secure application.
+That builds `Secure/build/sec_flash_demo_s.elf`,
+`NonSecure/build/sec_flash_demo_ns.elf` and the CMSE gateway import lib
+`Secure_nsclib/secure_nsclib.o`.
 
-#### <b>Notes</b>
+## Provision the board (once)
 
- 1. Care must be taken when using HAL_Delay(), this function provides accurate delay (in milliseconds)
-    based on variable incremented in SysTick ISR. This implies that if HAL_Delay() is called from
-    a peripheral ISR process, then the SysTick interrupt must have higher priority (numerically lower)
-    than the peripheral interrupt. Otherwise the caller ISR process will be blocked.
-    To change the SysTick interrupt priority you have to use HAL_NVIC_SetPriority() function.
+The first time you run the VSCode `TZ (JTAG): Build & Debug` configuration, it will give the error message: 
 
- 2. The application needs to ensure that the SysTick time base is always set to 1 millisecond
-    to have correct HAL operation.
+`ERROR: product is in the Open state. This demo must be run in a non-open state (provisioned or closed).`
 
-### <b>Keywords</b>
+To put your Nucleo STM32H533 board into the provision or closed state, simply use the provided script.
 
-TrustZone, STiROT, Boot path, Root Of Trust, MPU
+WARNING: This will enable Debug Authentication using ST's example DA keys (cloned into this repo). It's pretty simple to work with Debug Authentication. But if you're not aware that it's enabled, it may appear as though your board is non-responsive. See the [Debug Authentican](#debug-authentication) section below for working with (or regressing/removing) debug authentication.
 
-### <b>Directory contents</b>
+```
+cd ROT_Provisioning/scripts
+./provision.sh provisioned     # or: ./provision.sh closed
+```
 
-  - STiROT_Appli_TrustZone/Secure/Inc/main.h                  Header file for main.c
-  - STiROT_Appli_TrustZone/Secure/Inc/partition_stm32h533xx.h STM32H5xx Device System Configuration file
-  - STiROT_Appli_TrustZone/Secure/Inc/stm32h5xx_hal_conf.h    HAL configuration file
-  - STiROT_Appli_TrustZone/Secure/Inc/stm32h5xx_it.h          Header file for stm32h5xx_it.h
-  - STiROT_Appli_TrustZone/Secure/Src/main.c                  Secure Main program
-  - STiROT_Appli_TrustZone/Secure/Src/secure_nsc.c            Secure nonsecure callable functions
-  - STiROT_Appli_TrustZone/Secure/Src/stm32h5xx_hal_msp.c     Secure HAL MSP file
-  - STiROT_Appli_TrustZone/Secure/Src/stm32h5xx_it.c          Secure Interrupt handlers
-  - STiROT_Appli_TrustZone/Secure/Src/system_stm32h5xx_s.c    Secure STM32H5xx system clock configuration file
-  - STiROT_Appli_TrustZone/Secure_nsclib/secure_nsc.h         Header file for nonsecure callable functions
-  - STiROT_Appli_TrustZone/NonSecure/Inc/main.h               Header file for main.c
-  - STiROT_Appli_TrustZone/NonSecure/Inc/stm32h5xx_hal_conf.h HAL configuration file
-  - STiROT_Appli_TrustZone/NonSecure/Inc/stm32h5xx_it.h       Header file for stm32h5xx_it.c
-  - STiROT_Appli_TrustZone/NonSecure/Src/main.c               Non secure Main application file
-  - STiROT_Appli_TrustZone/NonSecure/Src/stm32h5xx_hal_msp.c  Non secure HAL MSP file
-  - STiROT_Appli_TrustZone/NonSecure/Src/stm32h5xx_it.c       Non secure Interrupt handlers
-  - STiROT_Appli_TrustZone/NonSecure/Src/system_stm32h5xx.c   Non secure System init file
-  - STiROT_Appli_TrustZone/EWARM/startup_stm32h5xx.c          Startup file in c
-  - STiROT_Appli_TrustZone/Binary                             Application firmware image (application binary + MCUBoot header and metadata)
+WARNING: ST's tools will print `Error: failed to reconnect after reset !` at the end. Don't be alarmed. The process to enable debug-auth uses unauthenticated debugging. So the final step (reboot into debug-auth-enabled mode) causes the unauthenticated session to lose connection. Start a new authenticated session with `./da.sh discover` to see that your board is still responsive:
 
-### <b>Hardware and Software environment</b>
+``` bash
+$ ./provision.sh provisioned
+...
 
-  - This template runs on STM32H533xx devices with security enabled (TZEN=B4).
-  - This template has been tested with STMicroelectronics NUCLEO-H533RE (MB1814)
-    board and can be easily tailored to any other supported device
-    and development board.
+Reconnecting...
+Error: failed to reconnect after reset !
+Error: Unable to reconnect after setting the Option Bytes
 
-### <b>How to use it ?</b>
+provision.sh is done.
+Dont mind the "Error: ... failed ... " messages above.
+Check with: ./da.sh discover
 
-This project is targeted to boot through <b>STiROT boot path</b>.
+$ ./da.sh discover
+...
+Start Debug Authentication Sequence
+...
+Debug Authentication: Discovery Success
+```
 
-<u>Before compiling the project, you should first start the provisioning process</u>. During the provisioning process, the linker files
-of Project_s and Project_ns as well as the postbuild command of Project_ns will be automatically updated.
+## Debug Authentication
 
-Before starting the provisioning process, select the application project to use (application example or template),
-through stirot_boot_path_project variable in ROT_Provisioning/env.bat or env.sh.
-Then start provisioning process by running ROT_Provisioning/STiROT/provisioning.bat or provisioning.sh, and follow its instructions.
+This app runs at HDPL1, so it needs `eh` permissions (secure & non-secure
+debug at HDPL1). Thus each subsquent flash will unlock debug authentication with:
 
-If the product state set to PROVISIONED, TZ-CLOSED or CLOSED, it is still possible to open the debug or to execute a full/partial regression
-with the Debug Authentication feature. To do it, scripts (regression.bat & dbg_auth.bat) are available in the ROT_provisioning/DA folder.
+``` bash
+cd ROT_Provisioning/scripts;
+./da.sh unlock eh
+```
 
-For more details, refer to Wiki article available here : https://wiki.st.com/stm32mcu/wiki/Category:Security
+Other `da.sh` commands include:
+```
+cd ROT_Provisioning/scripts;
+./da.sh discover      # product state + permission letters
+./da.sh ensure eh     # unlock only if debug is closed
+./da.sh close         # close debug again
+./da.sh regress       # back to Open, wipes the board
+```
 
-#### <b>Notes:</b>
+The keypairs & certificates under `ROT_Provisioning/DA/Keys` and
+`ROT_Provisioning/DA/Certificates` are ST's dev samples for this demo. They were copied from the Cube sample code installed locally in `~/STM32Cube/Repository/STM32Cube_FW_H5_V1.7.0/Projects/NUCLEO-H533RE/ROT_Provisioning/`. They are for demonstration purposes only and should no be used in production.
 
-  1. The most efficient way to develop and debug an application is to boot directly on user flash in the Open product state by setting with
-     STM32CubeProgrammer the UBE to 0xB4 and the SECBOOTADD to (0x0C000400 + offset of the firmware execution slot)
+## Flash
 
-  2. AppliCfg.py (located in Utilities/PC_Software/ROT_AppliConfig) is used during provisioning process.
-     It is needed to have python and some python packages installed in your environment.
-     Refer to Utilities/PC_Software/ROT_AppliConfig/README.md for more details.
+Once the device is provisioned or closed, again you can simply run the `TZ (JTAG): Build & Debug` configuration in VSCode's debug menu to re-build and flash the device.
 
+If you prefer to flash manually, mimic the command in the the `TZ: flash` task in `.vscode/tasks.json`. This command changes depending on wether you've checked out the `original-issue` tag or the `secure-flash-fix` tag.
 
+## Check the flash worked
 
+- If you've checked out the `original-issue` tag:
+    - The flash process will fail with the error `Fail to read NVM Size`. This is expected - you've recreated the original issue explained in 
+     https://www.summitembedded.com/blog/fixing-bugs-in-stm32s-secure-flashing-tool!
+
+- If you've checked out the `secure-flash-fix` tag:
+    - The VSCode task will build, unlock debug authentication, check your option bytes, and flash the firmware
+    - When the new firmware boots, the secure world prints a build stamp over the ST-LINK virtual COM port (USART2) before handing off to the non-secure side. View this with:
+
+        ```
+        picocom -b 115200 /dev/ttyACM0
+        
+        # prints:
+        # [SECURE] Hello world. Secure image built <date> <time>
+        ```
+        - The <date> <time> stamp comes from `__DATE__`/`__TIME__` in gcc. A fresh value is written to flash each time you run the VSCode task, to prove that the secure flash write worked and the bug is fixed. If it prints a stale timestamp, the flash write did not succeed.

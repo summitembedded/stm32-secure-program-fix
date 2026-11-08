@@ -40,6 +40,8 @@ extern funcptr_NS pSecureErrorCallback;
 /* Private variables ---------------------------------------------------------*/
 /* Private function prototypes -----------------------------------------------*/
 static void NonSecure_Init(void);
+static void SECURE_PrintBuildStamp(void);
+static UART_HandleTypeDef huart2;
 static void SystemIsolation_Config(void);
 static void CACHE_Enable(void);
 /* static void SystemClock_Config(void);  provided as example if secure sets clocks */
@@ -85,6 +87,9 @@ int main(void)
   /* Add your secure application code here prior to non-secure initialization
      */
 
+  /* Print build date to prove the secure image itself was reprogrammed */
+  SECURE_PrintBuildStamp();
+
 
   /* Secure SysTick should rather be suspended before calling non-secure  */
   /* in order to avoid wake-up from sleep mode entered by non-secure      */
@@ -98,6 +103,47 @@ int main(void)
   while (1)
   {
   }
+}
+
+/**
+  * @brief  Init USART2 (NUCLEO-H533RE VCP, PA2/PA3 AF7) and print a build stamp.
+  * @note   __DATE__/__TIME__ set at build time.
+  *         Runs in secure world to show the secure flash was truly reprogrammed.
+  *         115200 8N1 on USART2, but it goes through the ST-Link on Nucleo so
+  *         just use the ST-Link's Virtual COM Port (VCP, e.g. /dev/ttyACM0) to
+  *         see the output. /dev/ttyACM* devices don't need baud rate specified.
+  * @retval None
+  */
+static void SECURE_PrintBuildStamp(void)
+{
+  GPIO_InitTypeDef gpio = {0};
+
+  __HAL_RCC_GPIOA_CLK_ENABLE();
+  __HAL_RCC_USART2_CLK_ENABLE();
+
+  gpio.Pin       = GPIO_PIN_2 | GPIO_PIN_3;
+  gpio.Mode      = GPIO_MODE_AF_PP;
+  gpio.Pull      = GPIO_NOPULL;
+  gpio.Speed     = GPIO_SPEED_FREQ_HIGH;
+  gpio.Alternate = GPIO_AF7_USART2;
+  HAL_GPIO_Init(GPIOA, &gpio);
+
+  huart2.Instance            = USART2;
+  huart2.Init.BaudRate       = 115200;
+  huart2.Init.WordLength     = UART_WORDLENGTH_8B;
+  huart2.Init.StopBits       = UART_STOPBITS_1;
+  huart2.Init.Parity         = UART_PARITY_NONE;
+  huart2.Init.Mode           = UART_MODE_TX_RX;
+  huart2.Init.HwFlowCtl      = UART_HWCONTROL_NONE;
+  huart2.Init.OverSampling   = UART_OVERSAMPLING_16;
+  if (HAL_UART_Init(&huart2) != HAL_OK)
+  {
+    return;
+  }
+
+  const char msg[] = "\r\n[SECURE] Hello world. Secure image built "
+                     __DATE__ " " __TIME__ "\r\n";
+    HAL_UART_Transmit(&huart2, (const uint8_t *)msg, sizeof(msg) - 1U, 1000U);
 }
 
 /**
